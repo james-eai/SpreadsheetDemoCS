@@ -1,0 +1,178 @@
+﻿@using Kendo.Mvc.UI.Fluent
+@using Kendo.Mvc.UI
+@using SpreadsheetDemoCS.Models
+@model SpreadsheetDemoCS.Models.IndexModel
+@{
+    ViewBag.Title = "Home Page";
+}
+
+<div class="SheetContainer">
+    @DemoSheet()
+</div>
+
+@section Scripts
+    {
+    <script type="text/javascript">
+        var previous_value;
+        function onChange(options) {
+            console.log(`${previous_value} changed to ${options.range.value()}`);
+        }
+        function onSelect(options) {
+            previous_value = options.range.value();
+            console.log(`current cell value: ${previous_value}`);
+        }
+    </script>
+}
+
+@functions
+{
+    public SpreadsheetBuilder DemoSheet()
+    {
+        var properties = GetDisplayNames<SpreadsheetDataModel>();
+        var widths = new int[] { 120, 100, 3000 };
+        var s = Html.Kendo().Spreadsheet();
+        s.Name("DemoSheet");
+        s.HtmlAttributes(new { style = "width:100%" });
+        s.Events(e => e.Change("onChange").Select("onSelect"));
+        s.Sheetsbar(false);
+        s.Toolbar(false);
+        s.HeaderHeight(0);
+        s.HeaderWidth(0);
+        s.Sheets(sheets =>
+        {
+            var sheet = sheets.Add();
+            sheet.Name("Error Sheet");
+            sheet.DataSource<SpreadsheetDataModel>(ds =>
+            {
+                ds.Custom().Batch(true).Schema(schema => schema.Model(m => m.Id(p => p.KeyID)));
+            });
+            sheet.Columns(columns =>
+            {
+                for (int i = 0; i < widths.Length; i++)
+                {
+                    columns.Add().Width(widths[i]);
+                }
+            });
+            sheet.Rows(rows =>
+            {
+                rows.Add().Height(50).Cells(cells =>
+                {
+                    for (int i = 0; i < properties.Count - 2; i++)
+                    {
+                        cells.Add()
+                            .Bold(true)
+                            .Background("#ffffff")
+                            .Value(properties[i]);
+                    }
+                });
+                var cols = typeof(SpreadsheetDataModel).GetProperties().Length - 2;
+                foreach (var item in Model.Data)
+                {
+                    rows.Add().Cells(cells =>
+                    {
+                        for (int i = 0; i < properties.Count - 2; i++)
+                        {
+                            cells.Add()
+                            .Bold(false)
+                            .Value(item[i])
+                            .TextAlign(SpreadsheetTextAlign.Left)
+                            .Validation(v =>
+                            {
+                                if (properties[i].ToLower().Contains("date"))
+                                {
+                                    v.DataType("date")
+                                    .AllowNulls(false)
+                                    .Type("reject")
+                                    .ComparerType("greaterThan")
+                                    .From($"DATEVALUE(\"{DateTime.Today.ToString("MM/dd/yyyy")}\")")
+                                    .ShowButton(true)
+                                    .TitleTemplate("Invalid Date")
+                                    .MessageTemplate("Date cannot be in the past.");
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+            sheets.Add()
+            .Name("ListValues")
+            .Rows(rows => rows
+                .Add()
+                .Cells(cells =>
+                {
+                    cells.Add()
+                        .Value(true);
+                    cells.Add()
+                      .Value(false);
+                }));
+        });
+        s.Rows(Model.Data.Count + 1);
+        s.Columns(3);
+        return s;
+    }
+    public IList<string> GetDisplayNames<T>()
+    {
+        var words = typeof(T).GetProperties().Select(n => n.Name);
+        var spaced = new List<string>();
+        foreach (var clump in words)
+        {
+            var new_word = "";
+            int j = 0;
+            for (int i = 1; i < clump.Length; i++)
+            {
+                var next_bit = clump.Substring(j, i - j) + " ";
+                if (char.IsUpper(clump[i]) && next_bit.Where(n => char.IsLower(n)).Count() > 0)
+                {
+                    new_word += clump.Substring(j, i - j) + " ";
+                    j = i;
+                }
+                if (i + 1 == clump.Length)
+                {
+                    new_word += clump.Substring(j, i - j + 1);
+                }
+            }
+            spaced.Add(new_word);
+        }
+        return spaced;
+    }
+}
+
+@section Styles
+    {
+    <style>
+        .k-spreadsheet {
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .k-spreadsheet-scroller {
+            overflow-x: hidden;
+        }
+
+        .spreadsheets-container {
+            height: 50%;
+        }
+
+        .k-spreadsheet-action-bar,
+        .k-spreadsheet-row-header,
+        .k-spreadsheet-column-header,
+        .k-spreadsheet-top-corner {
+            display: none;
+        }
+
+        .k-spreadsheet-formula-bar,
+        .k-spreadsheet-formula-input {
+            pointer-events: none;
+            background-color: #eee !important;
+            padding-left: 0px !important;
+        }
+
+            .k-spreadsheet-formula-bar::before {
+                display: none !important;
+            }
+
+        .k-spreadsheet-name-editor {
+            display: none !important;
+        }
+    </style>
+}
